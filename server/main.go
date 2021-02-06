@@ -14,6 +14,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/rooms", HandleRooms)
 	mux.HandleFunc("/rooms/", HandleGetRoom)
+	mux.HandleFunc("/messages", HandlePostMessage)
 	muxWithMiddleware := DBMiddleware(db)(mux)
 
 	port := "8080"
@@ -108,6 +109,38 @@ func HandlePostRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, room)
+}
+
+type MessageCreateInput struct {
+	RoomName   string `json:"roomName"`
+	SenderName string `json:"senderName"`
+	Body       string `json:"body"`
+}
+
+func HandlePostMessage(w http.ResponseWriter, r *http.Request) {
+	var input MessageCreateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid format, must be JSON."))
+		return
+	}
+
+	if input.RoomName == "" || input.SenderName == "" || input.Body == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Keys 'roomName', 'senderName', and 'body' are required."))
+		return
+	}
+
+	dbInput := &Message{SenderName: input.SenderName, Body: input.Body}
+	db := DBFromRequest(r)
+	message, err := db.CreateMessage(input.RoomName, dbInput)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	writeJSON(w, message)
 }
 
 func writeJSON(w http.ResponseWriter, data interface{}) {
