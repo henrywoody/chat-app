@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,6 +11,9 @@ func main() {
 	db := NewDatabase()
 
 	mux := http.NewServeMux()
+	mux.Handle("/", HandleStatic("index.html", "text/html"))
+	mux.Handle("/static/css/", HandleStatic("", "text/css"))
+	mux.Handle("/static/js/", HandleStatic("", "application/javascript"))
 	mux.HandleFunc("/rooms", HandleRooms)
 	mux.HandleFunc("/rooms/", HandleGetRoom)
 	mux.HandleFunc("/messages", HandlePostMessage)
@@ -20,29 +22,6 @@ func main() {
 	port := "8080"
 	log.Printf("Server is running on port %s", port)
 	http.ListenAndServe(":"+port, muxWithMiddleware)
-}
-
-type contextKey int
-
-const (
-	dbContextKey contextKey = iota
-)
-
-func DBMiddleware(db *Database) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), dbContextKey, db)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-func DBFromRequest(r *http.Request) *Database {
-	db, ok := r.Context().Value(dbContextKey).(*Database)
-	if !ok {
-		panic("database not in request context")
-	}
-	return db
 }
 
 func HandleRooms(w http.ResponseWriter, r *http.Request) {
@@ -141,12 +120,4 @@ func HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, message)
-}
-
-func writeJSON(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 }
