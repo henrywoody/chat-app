@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+
+	"golang.org/x/net/websocket"
 )
 
 func main() {
@@ -16,12 +18,81 @@ func main() {
 	mux.Handle("/static/js/", HandleStatic("", "application/javascript"))
 	mux.HandleFunc("/rooms", HandleRooms)
 	mux.HandleFunc("/rooms/", HandleGetRoom)
-	mux.HandleFunc("/messages", HandlePostMessage)
+	mux.Handle("/messages", websocket.Handler(HandleSocket(db)))
 	muxWithMiddleware := DBMiddleware(db)(mux)
 
 	port := "8080"
 	log.Printf("Server is running on port %s", port)
 	http.ListenAndServe(":"+port, muxWithMiddleware)
+}
+
+type WebsocketConn struct {
+	conn               *websocket.Conn
+	roomName           string
+	roomSubscriptionID string
+}
+
+func HandleSocket(db *Database) func(*websocket.Conn) {
+	return func(ws *websocket.Conn) {
+		c := &WebsocketConn{conn: ws}
+		SetSocketRoom(c, db)
+		go ReadSocket(c, db)
+		go WriteSocket(c, db)
+		for {
+		}
+	}
+}
+
+type MessageCreateInput struct {
+	SenderName string `json:"senderName"`
+	Body       string `json:"body"`
+}
+
+type RoomSelection struct {
+	SelectRoom string `json:"selectRoom"`
+}
+
+func SetSocketRoom(c *WebsocketConn, db *Database) {
+	for {
+		var roomSelection RoomSelection
+		if err := websocket.JSON.Receive(c.conn, &roomSelection); err != nil {
+			log.Fatal("error encountered while reading room selection: ", err)
+		}
+		if roomSelection.SelectRoom != "" {
+			c.roomName = roomSelection.SelectRoom
+			return
+		}
+	}
+}
+
+func ReadSocket(c *WebsocketConn, db *Database) {
+	for {
+		var input MessageCreateInput
+		if err := websocket.JSON.Receive(c.conn, &input); err != nil {
+			if err.Error() == "EOF" {
+				c.conn.Close()
+				db.UnsubscribeFromRoom(c.roomName, c.roomSubscriptionID)
+				return
+			}
+			log.Fatal("error encountered while reading: ", err)
+		}
+		dbInput := &Message{SenderName: input.SenderName, Body: input.Body}
+		db.CreateMessage(c.roomName, dbInput)
+	}
+}
+
+func WriteSocket(c *WebsocketConn, db *Database) {
+	writeMessages := func(messages []*Message) {
+		err := websocket.JSON.Send(c.conn, messages)
+		if err != nil {
+			log.Fatal("error encountered while writing: ", err)
+		}
+	}
+
+	room, _ := db.GetRoom(c.roomName)
+	writeMessages(room.Messages)
+
+	c.roomSubscriptionID = db.SubscribeToRoom(c.roomName, writeMessages)
 }
 
 func HandleRooms(w http.ResponseWriter, r *http.Request) {
@@ -88,36 +159,4 @@ func HandlePostRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, room)
-}
-
-type MessageCreateInput struct {
-	RoomName   string `json:"roomName"`
-	SenderName string `json:"senderName"`
-	Body       string `json:"body"`
-}
-
-func HandlePostMessage(w http.ResponseWriter, r *http.Request) {
-	var input MessageCreateInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid format, must be JSON."))
-		return
-	}
-
-	if input.RoomName == "" || input.SenderName == "" || input.Body == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Keys 'roomName', 'senderName', and 'body' are required."))
-		return
-	}
-
-	dbInput := &Message{SenderName: input.SenderName, Body: input.Body}
-	db := DBFromRequest(r)
-	message, err := db.CreateMessage(input.RoomName, dbInput)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	writeJSON(w, message)
 }

@@ -57,7 +57,7 @@ export default function App() {
                 { activeRoomName === "" ? (
                     <ChatRoomPlaceholder/>
                 ) : (
-                    <ChatRoom name={activeRoomName}/>
+                    <ChatRoom key={activeRoomName} name={activeRoomName}/>
                 )}
             </UserContext.Provider>
         </div>

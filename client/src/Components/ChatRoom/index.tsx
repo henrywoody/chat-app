@@ -1,7 +1,7 @@
 import React from "react";
 import { Message } from "../../Modules/types";
 import useFetchState from "../../Hooks/use-fetch-state";
-import { getRoom, sendMessage } from "../../Modules/api";
+import { connectToRoom } from "../../Modules/api";
 import UserContext from "../../Contexts/UserContext";
 import styles from "./style.module.css";
 
@@ -16,25 +16,31 @@ export default function ChatRoom({name}: ChatRoomProps) {
         data: messages,
         setData: setMessages,
         isErrored,
-        setIsErrored,
     } = useFetchState<Message[]>([]);
 
+    const socketRef = React.useRef<WebSocket | null>(null);
+    const feedRef = React.useRef<HTMLDivElement>(null);
+
     React.useEffect(() => {
-        (async () => {
-            setIsLoading(true);
-
-            const { data: room, error } = await getRoom(name);
-            if (error !== undefined) {
-                setIsErrored(true);
-                setMessages([]);
-            } else {
-                setIsErrored(false);
-                setMessages(room!.messages);
-            }
-
+        const {socket, closeSocket} = connectToRoom(name, (data: Message[]) => {
+            setMessages(data);
             setIsLoading(false);
-        })();
+        });
+        socketRef.current = socket;
+
+        return () => {
+            closeSocket(socketRef.current!);
+        }
     }, [name]);
+
+    React.useEffect(() => {
+        window.setTimeout(() => {
+            if (feedRef.current === null) {
+                return;
+            }
+            feedRef.current.scrollTo(0, feedRef.current.scrollHeight)
+        }, 0);
+    }, [messages]);
 
     const content = React.useMemo(() => {
         if (isLoading) {
@@ -54,11 +60,11 @@ export default function ChatRoom({name}: ChatRoomProps) {
 
     return (
         <div className={styles["chatroom"]}>
-            <div className={styles["chatroom__message-feed"]}>
+            <div ref={feedRef} className={styles["chatroom__message-feed"]}>
                 {content}
             </div>
 
-            <MessageComposer roomName={name}/>
+            <MessageComposer roomName={name} socket={socketRef.current}/>
         </div>
     )
 }
@@ -88,13 +94,15 @@ function MessageDisplay({message}: MessageDisplayProps) {
 
 type MessageComposerProps = {
     roomName: string;
+    socket: WebSocket | null
 }
 
-function MessageComposer({roomName}: MessageComposerProps) {
+function MessageComposer({roomName, socket}: MessageComposerProps) {
     const { username } = React.useContext(UserContext);
 
     const [body, setBody] = React.useState("");
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
         setBody("");
@@ -107,9 +115,14 @@ function MessageComposer({roomName}: MessageComposerProps) {
             return;
         }
         setIsSubmitting(true);
-        const {error} = await sendMessage(roomName, username, body);
-        if (error === undefined) {
+        if (socket !== null && socket.readyState === WebSocket.OPEN) {
+            socket?.send(JSON.stringify({roomName, senderName: username, body}));
             setBody("");
+            if (textAreaRef.current !== null) {
+                textAreaRef.current.focus();
+            }
+        } else {
+            console.log("unable to send message; socket: ", socket);
         }
         setIsSubmitting(false);
     }, [roomName, username, body]);
@@ -117,7 +130,7 @@ function MessageComposer({roomName}: MessageComposerProps) {
     return (
         <div className={styles["chatroom__message-composer"]}>
             <form onSubmit={onSubmit}>
-                <textarea name="body" value={body} onChange={e => setBody(e.target.value)}/>
+                <textarea ref={textAreaRef} name="body" value={body} onChange={e => setBody(e.target.value)} autoFocus/>
                 <button type="submit" disabled={isSubmitting}>Send</button>
             </form>
         </div>

@@ -27,14 +27,25 @@ export async function getRoom(name: string): Promise<APIResponse<Room>> {
     return {data: json};
 }
 
-export async function sendMessage(roomName: string, senderName: string, body: string): Promise<APIResponse<Message>> {
-    const payload = { roomName, senderName, body };
-    const response = await fetch("/messages", {method: "POST", body: JSON.stringify(payload)});
-    if (!response.ok) {
-        const text = await response.text();
-        return {error: text};
+export function connectToRoom(roomName: string, callback: (data: Message[]) => void) {
+    const socket = new WebSocket("ws://localhost:8080/messages");
+    function selectRoom() {
+        socket.send(JSON.stringify({selectRoom: roomName}));
+    }
+    socket.addEventListener("open", selectRoom);
+    socket.addEventListener("message", event => {
+        const data = JSON.parse(event.data);
+        callback(data);
+    })
+
+    function closeSocket(socket: WebSocket) {
+        if (socket.readyState === WebSocket.CONNECTING) {
+            socket.removeEventListener("open", selectRoom);
+            socket.addEventListener("open", () => socket.close());
+        } else if (socket.readyState === WebSocket.OPEN) {
+            socket.close();
+        }
     }
 
-    const json = await response.json();
-    return {data: json};
+    return {socket, closeSocket}
 }
