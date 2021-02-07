@@ -1,0 +1,39 @@
+.rooms-panel {
+    color: #eee;
+    background-color: #222;
+    width: 25%;
+    min-width: 10rem;
+    max-width: 13rem;
+    height: 100vh;
+    display: flex;
+    flex-flow: column;
+    flex-shrink: 0;
+}
+
+.rooms-panel__header {
+    font-size: 1.5rem;
+    text-align: center;
+    background-color: #4a4a4a;
+    padding: .5rem 1rem;
+}
+
+.rooms-panel__room-tab {
+    font-size: 1rem;
+    color: #eee;
+    padding: 1rem 1rem calc(1rem - 2px);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
+
+.rooms-panel__room-tab:nth-child(2n + 1) {
+    background-color: #333;
+}
+
+.rooms-panel__room-tab:hover {
+    background-color: #3a3a3a;
+}
+
+.rooms-panel__room-tab.rooms-panel__room-tab--active {
+    color: #222;
+    background-color: #fff;
+}

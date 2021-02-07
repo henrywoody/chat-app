@@ -1,0 +1,66 @@
+.chatroom {
+    display: flex;
+    flex-flow: column;
+    flex-grow: 1;
+}
+
+.chatroom__message-feed {
+    width: 100%;
+    padding: 1rem;
+    overflow: scroll;
+    display: flex;
+    flex-flow: column;
+    flex-grow: 1;
+}
+
+.message-feed__message {
+    margin-bottom: .75rem;
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+}
+
+.message-feed__message--from-user {
+    align-items: flex-end;
+}
+
+.message-feed__message__sender-name {
+    font-size: .9rem;
+    color: #666;
+    margin-bottom: .25rem;
+}
+
+.message-feed__message__body {
+    font-size: 1.1rem;
+    max-width: 75%;
+    background-color: #ddd;
+    padding: .5rem 1rem;
+    border-radius: .25rem;
+    margin: 0;
+}
+
+.chatroom__message-composer {
+    height: 5rem;
+    padding-bottom: .5rem;
+}
+
+.chatroom__message-composer form {
+    height: 100%;
+    display: flex;
+    flex-flow: row;
+}
+
+.chatroom__message-composer textarea {
+    resize: vertical;
+    outline: none;
+    font-size: 1.1rem;
+    flex-grow: 1;
+}
+
+.chatroom__message-composer button {
+    font-size: 1.25rem;
+    background-color: #ddd;
+    padding: 1rem;
+    flex-grow: 0;
+    flex-shrink: 0;
+}

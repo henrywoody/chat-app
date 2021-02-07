@@ -19,7 +19,7 @@ type Room struct {
 }
 
 type Message struct {
-	ID         int       `json:"id"`
+	ID         int       `json:"ID"`
 	SenderName string    `json:"senderName"`
 	SentAt     time.Time `json:"sentAt"`
 	Body       string    `json:"body"`

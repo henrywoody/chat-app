@@ -1,0 +1,11 @@
+.app {
+    display: flex;
+    flex-flow: row;
+}
+
+.chatroom-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+}
